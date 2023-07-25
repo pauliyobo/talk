@@ -1,5 +1,5 @@
 //! NVDA driver
-use anyhow::{bail, Context};
+use anyhow::bail;
 use libloading::os::windows::{Library, Symbol};
 use crate::drivers::Driver;
 use std::env::current_dir;
@@ -45,10 +45,6 @@ impl Driver for NVDA {
         "NVDA"
     }
     
-    fn is_speaking(&self) -> bool {
-        false
-    }
-
     fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool {
         let s = text.into();
         let c_str = U16CString::from_str(s);
@@ -73,14 +69,6 @@ impl Driver for NVDA {
         } else {
             false
         }
-    }
-
-    fn output(&self, text: &str, interrupt: bool) -> bool {
-        self.speak(text, interrupt) || self.braille(text)
-    }
-
-    fn silence(&self) -> bool {
-        false
     }
 }
 

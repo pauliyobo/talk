@@ -23,18 +23,6 @@ impl Driver for Sapi {
         "Sapi"
     }
 
-    fn is_speaking(&self) -> bool {
-        false
-    }
-
-    fn braille<S: Into<String>>(&self, _text: S) -> bool {
-        false
-    }
-
-    fn silence(&self) -> bool {
-        false
-    }
-
     fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool {
         let text: String = text.into();
         let cstr = U16CString::from_str(&text).unwrap();
