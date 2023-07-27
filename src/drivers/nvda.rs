@@ -1,7 +1,7 @@
 //! NVDA driver
+use crate::drivers::Driver;
 use anyhow::bail;
 use libloading::os::windows::{Library, Symbol};
-use crate::drivers::Driver;
 use std::env::current_dir;
 use std::path::Path;
 use widestring::U16CString;
@@ -10,14 +10,13 @@ use widestring::U16CString;
 pub fn nvda_dll_name() -> &'static str {
     #[cfg(target_arch = "x86")]
     {
-        return "nvdaControllerClient32.dll"
+        return "nvdaControllerClient32.dll";
     }
-    return "nvdaControllerClient64.dll";
+    "nvdaControllerClient64.dll"
 }
 
-
-type SpeakText = Symbol<unsafe extern fn(*const u16, bool) -> bool>;
-type Braille = Symbol<unsafe extern fn(*const u16) -> bool>;
+type SpeakText = Symbol<unsafe extern "C" fn(*const u16, bool) -> bool>;
+type Braille = Symbol<unsafe extern "C" fn(*const u16) -> bool>;
 
 pub struct NVDA(Library);
 
@@ -44,36 +43,22 @@ impl Driver for NVDA {
     fn name(&self) -> &'static str {
         "NVDA"
     }
-    
+
     fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool {
         let s = text.into();
-        let c_str = U16CString::from_str(s);
-        if let Some(s) = c_str.ok() {
-            unsafe {
-                let speak: SpeakText = self.0.get(b"nvdaController_speakText").unwrap();
-                speak(s.as_ptr(), interrupt)
-            }
-        } else {
-            false
+        let c_str = U16CString::from_str(s).unwrap();
+        unsafe {
+            let speak: SpeakText = self.0.get(b"nvdaController_speakText").unwrap();
+            speak(c_str.as_ptr(), interrupt)
         }
     }
 
     fn braille<S: Into<String>>(&self, text: S) -> bool {
         let s = text.into();
-        let c_str = U16CString::from_str(s);
-        if let Some(s) = c_str.ok() {
-            unsafe {
-                let braille: Braille = self.0.get(b"nvdaController_brailleMessage").unwrap();
-                braille(s.as_ptr())
-            }
-        } else {
-            false
+        let c_str = U16CString::from_str(s).unwrap();
+        unsafe {
+            let braille: Braille = self.0.get(b"nvdaController_brailleMessage").unwrap();
+            braille(c_str.as_ptr())
         }
-    }
-}
-
-impl Drop for NVDA {
-    fn drop(&mut self) {
-        drop(&self.0);
     }
 }
