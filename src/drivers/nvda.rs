@@ -44,18 +44,16 @@ impl Driver for NVDA {
         "NVDA"
     }
 
-    fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool {
-        let s = text.into();
-        let c_str = U16CString::from_str(s).unwrap();
+    fn speak(&self, text: &str, interrupt: bool) -> bool {
+        let c_str = U16CString::from_str(text).unwrap();
         unsafe {
             let speak: SpeakText = self.0.get(b"nvdaController_speakText").unwrap();
             speak(c_str.as_ptr(), interrupt)
         }
     }
 
-    fn braille<S: Into<String>>(&self, text: S) -> bool {
-        let s = text.into();
-        let c_str = U16CString::from_str(s).unwrap();
+    fn braille(&self, text: &str) -> bool {
+        let c_str = U16CString::from_str(text).unwrap();
         unsafe {
             let braille: Braille = self.0.get(b"nvdaController_brailleMessage").unwrap();
             braille(c_str.as_ptr())

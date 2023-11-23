@@ -20,9 +20,9 @@ pub trait Driver {
         false
     }
 
-    fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool;
+    fn speak(&self, text: &str, interrupt: bool) -> bool;
 
-    fn braille<S: Into<String>>(&self, _text: S) -> bool {
+    fn braille(&self, _text: &str) -> bool {
         false
     }
 

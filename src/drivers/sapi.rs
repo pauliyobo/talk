@@ -26,9 +26,8 @@ impl Driver for Sapi {
         "Sapi"
     }
 
-    fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool {
-        let text: String = text.into();
-        let bstr = to_bstr(&text).unwrap();
+    fn speak(&self, text: &str, interrupt: bool) -> bool {
+        let bstr = to_bstr(text).unwrap();
         // SVSFlagsAsync does not seem to work
         let mut flags: SpeechVoiceSpeakFlags = SVSFIsNotXML;
         if interrupt {

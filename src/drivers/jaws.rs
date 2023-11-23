@@ -46,9 +46,8 @@ impl Driver for JAWS {
         "JAWS"
     }
 
-    fn speak<S: Into<String>>(&self, text: S, interrupt: bool) -> bool {
-        let text = text.into();
-        let bstr = to_bstr(&text).unwrap();
+    fn speak(&self, text: &str, interrupt: bool) -> bool {
+        let bstr = to_bstr(text).unwrap();
         let mut success = VARIANT_FALSE;
         let flush = if interrupt {
             VARIANT_TRUE
@@ -58,8 +57,7 @@ impl Driver for JAWS {
         unsafe { self.0.SayString(bstr, flush, &mut success).is_ok() && success == VARIANT_TRUE }
     }
 
-    fn braille<S: Into<String>>(&self, text: S) -> bool {
-        let text = text.into();
+    fn braille(&self, text: &str) -> bool {
         // To output braille with JAWS we need to run the script BrailleString("text")
         let text = to_bstr(&format!("BrailleString(\"{}\")", text)).unwrap();
         let mut success = VARIANT_FALSE;
