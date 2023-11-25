@@ -3,15 +3,18 @@ use crate::drivers::Driver;
 use crate::utils::to_bstr;
 use windows::{Win32::Media::Speech::*, Win32::System::Com::*};
 
-pub struct Sapi(ISpeechVoice);
+pub struct Sapi(Option<ISpeechVoice>, bool);
 
 impl Sapi {
     pub fn new() -> Self {
         unsafe { CoInitialize(None).unwrap() };
-        let voice: ISpeechVoice = unsafe {
-            CoCreateInstance(&SpVoice, None, CLSCTX_ALL).expect("Could not initialize Sapi voice.")
+        let voice: Option<ISpeechVoice> = unsafe {
+            CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
+                .map_or_else(|_| None, |x| Some(x))
+                .into()
         };
-        Sapi(voice)
+        let active = voice.is_some();
+        Sapi(voice, active)
     }
 }
 
@@ -33,6 +36,10 @@ impl Driver for Sapi {
         if interrupt {
             flags.0 |= SVSFPurgeBeforeSpeak.0;
         }
-        unsafe { self.0.Speak(&bstr, flags).is_ok() }
+        unsafe { self.0.as_ref().unwrap().Speak(&bstr, flags).is_ok() }
+    }
+
+    fn is_active(&self) -> bool {
+        self.1
     }
 }

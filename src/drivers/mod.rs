@@ -31,4 +31,7 @@ pub trait Driver {
     }
 
     fn silence(&self) {}
+
+    /// specifies whether the driver is active
+    fn is_active(&self) -> bool;
 }
