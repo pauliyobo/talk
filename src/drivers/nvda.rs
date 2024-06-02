@@ -1,42 +1,64 @@
 //! NVDA driver
 use crate::drivers::Driver;
 use libloading::os::windows::{Library, Symbol};
+use once_cell::sync::OnceCell;
 use std::env::current_dir;
 use std::path::Path;
 use widestring::U16CString;
 
-/// Detects the name of the right NVDA DLL to call
+static NVDA_LIBRARY: OnceCell<Library> = OnceCell::new();
+static SPEAK_TEXT: OnceCell<Symbol<unsafe extern "C" fn(*const u16, bool) -> bool>> =
+    OnceCell::new();
+static BRAILLE_MESSAGE: OnceCell<Symbol<unsafe extern "C" fn(*const u16) -> bool>> =
+    OnceCell::new();
+
 pub fn nvda_dll_name() -> &'static str {
     #[cfg(target_arch = "x86")]
     {
-        return "nvdaControllerClient32.dll";
+        "nvdaControllerClient32.dll"
     }
-    "nvdaControllerClient64.dll"
+    #[cfg(not(target_arch = "x86"))]
+    {
+        "nvdaControllerClient64.dll"
+    }
+}
+fn init_nvda(library_path: Option<&Path>) -> bool {
+    NVDA_LIBRARY.get_or_init(|| {
+        let path = library_path.map_or_else(
+            || {
+                let cwd = current_dir().expect("Failed to get current directory");
+                cwd.join(nvda_dll_name())
+            },
+            |p| {
+                if p.is_dir() {
+                    p.join(nvda_dll_name())
+                } else {
+                    p.to_path_buf()
+                }
+            },
+        );
+        unsafe { Library::new(path).unwrap() }
+    });
+
+    let lib = match NVDA_LIBRARY.get() {
+        Some(lib) => lib,
+        None => return false,
+    };
+
+    unsafe {
+        SPEAK_TEXT.get_or_init(|| lib.get(b"nvdaController_speakText").unwrap());
+        BRAILLE_MESSAGE.get_or_init(|| lib.get(b"nvdaController_brailleMessage").unwrap());
+    }
+
+    NVDA_LIBRARY.get().is_some()
 }
 
-type SpeakText = Symbol<unsafe extern "C" fn(*const u16, bool) -> bool>;
-type Braille = Symbol<unsafe extern "C" fn(*const u16) -> bool>;
-
-pub struct NVDA(Option<Library>, bool);
+pub struct NVDA;
 
 impl NVDA {
-    /// Createa NVDA driver
-    /// The driver expects a library path to load the controller DLL from
-    /// If the library_path is None, the library will be searched in the current directory
-    pub fn new(library_path: Option<&Path>) -> NVDA {
-        let cwd = current_dir().unwrap();
-        let library_path = match library_path {
-            Some(p) => p,
-            None => cwd.as_path(),
-        };
-        let library_path = library_path.join(nvda_dll_name());
-        let lib: Option<Library> = unsafe {
-            Library::new(library_path)
-                .map_or_else(|_| None, |x| Some(x))
-                .into()
-        };
-        let active = lib.is_some();
-        NVDA(lib, active)
+    pub fn new(library_path: Option<&Path>) -> Self {
+        let _ = init_nvda(library_path);
+        NVDA
     }
 }
 
@@ -48,30 +70,22 @@ impl Driver for NVDA {
     fn speak(&self, text: &str, interrupt: bool) -> bool {
         let c_str = U16CString::from_str(text).unwrap();
         unsafe {
-            let speak: SpeakText = self
-                .0
-                .as_ref()
-                .unwrap()
-                .get(b"nvdaController_speakText")
-                .unwrap();
-            speak(c_str.as_ptr(), interrupt)
+            SPEAK_TEXT
+                .get()
+                .map_or(false, |speak| speak(c_str.as_ptr(), interrupt))
         }
     }
 
     fn braille(&self, text: &str) -> bool {
         let c_str = U16CString::from_str(text).unwrap();
         unsafe {
-            let braille: Braille = self
-                .0
-                .as_ref()
-                .unwrap()
-                .get(b"nvdaController_brailleMessage")
-                .unwrap();
-            braille(c_str.as_ptr())
+            BRAILLE_MESSAGE
+                .get()
+                .map_or(false, |braille| braille(c_str.as_ptr()))
         }
     }
 
     fn is_active(&self) -> bool {
-        self.1
+        NVDA_LIBRARY.get().is_some()
     }
 }

@@ -1,7 +1,10 @@
-// Will assume the DLL is in the same directory
+//! NVDA driver
+use std::path::PathBuf;
 use talk::drivers::{Driver, NVDA};
-
 fn main() {
-    let nvda = NVDA::new("nvdaControllerClient64.dll");
-    nvda.output("This is a test", false);
+    let nvda_dll_path = PathBuf::from("nvdaControllerClient64.dll");
+    let nvda = NVDA::new(Some(nvda_dll_path.as_path()));
+
+    nvda.speak("Hello, NVDA!", true);
+    nvda.braille("Hello, NVDA braille!");
 }
