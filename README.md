@@ -5,7 +5,7 @@ The API is expected to break frequently for now, so use at your own risk, if you
 Talk makes use of a single concept, `Driver` which is a trait used to implement generic abstractions over screenreaders.
 You may find some examples in the [examples](https://github.com/pauliyobo/talk/blob/master/examples) folder
 ## Example
-The API below has been stuctured almost identically as the original tolk's API.
+The API below has been stuctured almost identically to  the original tolk's API.
 
 ```rust
 use talk::Talk;
@@ -19,7 +19,7 @@ fn main() {
     // output only braille
     talk.braille("txt");
     // Output both text and braille
-    talk.speak("Testing", true);
+    talk.output("Testing", true);
 }
 ```
 
