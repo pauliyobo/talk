@@ -2,10 +2,10 @@
 #![allow(non_camel_case_types, non_snake_case)]
 use crate::drivers::Driver;
 use crate::utils::to_bstr;
-use windows::core::{interface, BSTR, HRESULT};
-use windows::w;
 use windows::Win32::Foundation::{VARIANT_BOOL, VARIANT_FALSE, VARIANT_TRUE};
 use windows::Win32::System::Com::*;
+use windows::core::{BSTR, HRESULT, interface};
+use windows::w;
 
 #[interface("123DEDB4-2CF6-429C-A2AB-CC809E5516CE")]
 unsafe trait IJawsApi: IDispatch {

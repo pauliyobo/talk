@@ -2,7 +2,7 @@ pub mod drivers;
 mod utils;
 
 use drivers::Driver;
-use drivers::{Sapi, JAWS, NVDA};
+use drivers::{JAWS, NVDA, Sapi};
 use once_cell::sync::OnceCell;
 use send_wrapper::SendWrapper;
 

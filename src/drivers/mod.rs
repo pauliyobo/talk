@@ -9,7 +9,7 @@ pub use self::sapi::Sapi;
 ///
 /// This trait defines the interface of a screen reader driver
 /// It will be used to query info and interact with the underlying library instance
-/// Every method except for `speak` have a default implementation
+/// Every method except for `speak` has a default implementation
 /// This allows for flexible customization and less repetitive code for the implementors of this trait, as screen readers and or TTS may support different features
 pub trait Driver {
     /// the name of the driver
@@ -34,4 +34,17 @@ pub trait Driver {
 
     /// specifies whether the driver is active
     fn is_active(&self) -> bool;
+}
+
+#[derive(Debug)]
+pub enum Command {
+    Speak(String, bool),
+    Braille(String),
+    Output(String, bool),
+    IsSpeaking,
+    Silence,
+    /// used to shutdown the background thread loop
+    /// Useful in Drop contexts
+    Shutdown,
+    IsActive(oneshot::Sender<bool>),
 }
