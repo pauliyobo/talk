@@ -33,9 +33,13 @@ pub trait Driver {
     fn silence(&self) {}
 
     /// specifies whether the driver is active
-    fn is_active(&self) -> bool;
+    fn is_active(&self) -> bool {
+        false
+    }
 }
 
+/// Message used to interact with background thread workers that will interact with the specific driver
+/// Useful in cases where the only communication mechanism is for example COM
 #[derive(Debug)]
 pub enum Command {
     Speak(String, bool),

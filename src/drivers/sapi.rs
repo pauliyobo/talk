@@ -8,11 +8,13 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use windows::{Win32::Media::Speech::*, Win32::System::Com::*};
 
-/// loop used in a background thread to listen for messages issuing for speak commands
+/// loop used in a background thread to listen for messages issuing speak commands
 /// This allows us to interact with the COM instance from other threads using crossbeam channels
 /// The overhead itself should be relatively minimal
+/// # SAFETY
+/// `CoInitializeEx()` is going to be entirely managed by this thread, and we expect it to be called at most once per thread
 fn sapi_loop(rx: Receiver<Command>) {
-    unsafe { CoInitialize(None).unwrap() };
+    unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).unwrap() };
     let voice: Option<ISpeechVoice> = unsafe {
         CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
             .map_or_else(|_| None, |x| Some(x))
@@ -98,6 +100,6 @@ impl Driver for Sapi {
     fn is_active(&self) -> bool {
         let (s, r) = oneshot::channel();
         self.inner.sender.send(Command::IsActive(s)).unwrap();
-        r.recv_timeout(Duration::from_secs(5)).is_ok()
+        r.recv_timeout(Duration::from_secs(1)).is_ok()
     }
 }
