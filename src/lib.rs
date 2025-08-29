@@ -20,7 +20,9 @@ impl Talk {
         ITEMS.get_or_init(move || {
             let mut drivers: Vec<Box<dyn Driver>> = Vec::new();
             drivers.push(Box::new(Sapi::new()));
-            drivers.push(Box::new(JAWS::new()));
+            if let Ok(jaws) = JAWS::new() {
+                drivers.push(Box::new(jaws));
+            }
             drivers.push(Box::new(NVDA::new(None)));
             // if we don't prefer sapi, move it to last.
 

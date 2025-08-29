@@ -5,6 +5,7 @@ pub use self::jaws::JAWS;
 pub use self::nvda::NVDA;
 pub use self::sapi::Sapi;
 
+use thiserror::Error;
 /// The Driver trait
 ///
 /// This trait defines the interface of a screen reader driver
@@ -51,4 +52,12 @@ pub enum Command {
     /// Useful in Drop contexts
     Shutdown,
     IsActive(oneshot::Sender<bool>),
+}
+
+/// General library error
+#[derive(Debug, Error)]
+pub enum TalkError {
+    /// The initialization of a driver has failed
+    #[error("Driver initialization has failed")]
+    DriverInitializationError,
 }
