@@ -29,7 +29,7 @@ unsafe trait IJawsApi: IDispatch {
 /// loop used in a background thread to listen for messages issuing speak commands
 /// This allows us to interact with the COM instance from other threads using crossbeam channels
 /// The overhead itself should be relatively minimal
-/// # SAFETY
+/// # Safety
 /// `CoInitializeEx()` is going to be entirely managed by this thread, and we expect it to be called at most once per thread
 fn jaws_loop(rx: Receiver<Command>, status: oneshot::Sender<Result<(), TalkError>>) {
     let guid = unsafe { CLSIDFromProgID(w!("freedomsci.jawsapi")) };
@@ -92,6 +92,7 @@ impl Drop for JAWSInner {
     }
 }
 
+#[derive(Clone)]
 pub struct JAWS {
     inner: Arc<JAWSInner>,
 }
