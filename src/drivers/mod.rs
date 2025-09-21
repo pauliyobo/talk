@@ -48,7 +48,7 @@ pub enum Command {
     Speak(String, bool),
     Braille(String),
     Output(String, bool),
-    IsSpeaking,
+    IsSpeaking(oneshot::Sender<bool>),
     Silence,
     /// used to shutdown the background thread loop
     /// Useful in Drop contexts
