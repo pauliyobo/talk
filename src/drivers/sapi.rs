@@ -5,7 +5,6 @@ use crate::utils::to_bstr;
 use crossbeam::channel::{Receiver, Sender, bounded};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::Duration;
 use windows::{Win32::Media::Speech::*, Win32::System::Com::*};
 
 /// loop used in a background thread to listen for messages issuing speak commands
@@ -32,11 +31,10 @@ fn sapi_loop(rx: Receiver<Command>) {
                 let _ = unsafe { voice.as_ref().unwrap().Speak(&bstr, flags).is_ok() };
             }
             Command::Shutdown => break,
-            Command::IsActive(sender) => sender.send(true).unwrap(),
+            Command::IsActive(sender) => sender.send(true).unwrap_or_default(),
             _ => println!("Unimplemented"),
         }
     }
-    println!("Shutting down COM.");
     unsafe {
         CoUninitialize();
     }
@@ -50,7 +48,6 @@ struct SapiInner {
 
 impl Drop for SapiInner {
     fn drop(&mut self) {
-        println!("Killing Sapi Inner");
         self.sender.send(Command::Shutdown).unwrap();
         if let Some(handle) = self.thread_handle.take() {
             handle.join().unwrap();
@@ -67,7 +64,6 @@ impl Sapi {
     pub fn new() -> Self {
         let (sender, r) = bounded(1);
         let thread_handle = std::thread::spawn(move || {
-            println!("Starting sapi loop");
             sapi_loop(r);
         });
         let inner = Arc::new(SapiInner {
@@ -100,6 +96,6 @@ impl Driver for Sapi {
     fn is_active(&self) -> bool {
         let (s, r) = oneshot::channel();
         self.inner.sender.send(Command::IsActive(s)).unwrap();
-        r.recv_timeout(Duration::from_secs(1)).is_ok()
+        r.recv().unwrap()
     }
 }
