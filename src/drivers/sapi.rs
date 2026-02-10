@@ -13,6 +13,16 @@ use windows::{
     Win32::UI::WindowsAndMessaging::{DispatchMessageW, MSG, PM_REMOVE, PeekMessageW},
 };
 
+/// handles message pumping for the current thread
+fn handle_message_pump() {
+    let mut msg = MSG::default();
+    unsafe {
+        while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+            DispatchMessageW(&msg);
+        }
+    }
+}
+
 /// loop used in a background thread to listen for messages issuing speak commands
 /// This allows us to interact with the COM instance from other threads using crossbeam channels
 /// The overhead itself should be relatively minimal
@@ -29,12 +39,7 @@ fn sapi_loop(rx: Receiver<Command>) {
     loop {
         // We need to manually pump COM messages because
         // using the async flag while speaking would put the speak request in a queue, which wouldn't be processed on this thread
-        unsafe {
-            let mut msg = MSG::default();
-            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
-                DispatchMessageW(&msg);
-            }
-        };
+        handle_message_pump();
         match rx.try_recv() {
             Err(TryRecvError::Empty) => std::thread::sleep(Duration::from_millis(1)),
             Err(TryRecvError::Disconnected) => break,
@@ -71,12 +76,7 @@ fn sapi_loop(rx: Receiver<Command>) {
     if last_stream > 0 {
         if let Some(v) = voice.as_ref() {
             loop {
-                unsafe {
-                    let mut msg = MSG::default();
-                    while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
-                        DispatchMessageW(&msg);
-                    }
-                }
+                handle_message_pump();
                 let done = unsafe {
                     v.Status()
                         .ok()
