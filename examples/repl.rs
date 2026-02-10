@@ -13,7 +13,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 talk.speak("switching to NVDA", false);
                 talk = Talk::nvda();
                 talk.speak("Switched to NVDA", false);
-
             }
             "exit\r\n" => break,
             "speaking\r\n" => println!("{}", talk.is_speaking()),
