@@ -53,6 +53,7 @@ fn init_nvda(library_path: Option<&Path>) -> bool {
     NVDA_LIBRARY.get().is_some()
 }
 
+#[derive(Clone)]
 pub struct NVDA;
 
 impl NVDA {
