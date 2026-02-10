@@ -2,11 +2,16 @@
 use crate::drivers::Command;
 use crate::drivers::Driver;
 use crate::utils::to_bstr;
+use crossbeam::channel::TryRecvError;
 use crossbeam::channel::{Receiver, Sender, bounded};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use windows::{Win32::Media::Speech::*, Win32::System::Com::*};
+use windows::{
+    Win32::Media::Speech::*,
+    Win32::System::Com::*,
+    Win32::UI::WindowsAndMessaging::{DispatchMessageW, MSG, PM_REMOVE, PeekMessageW},
+};
 
 /// loop used in a background thread to listen for messages issuing speak commands
 /// This allows us to interact with the COM instance from other threads using crossbeam channels
@@ -20,38 +25,75 @@ fn sapi_loop(rx: Receiver<Command>) {
             .map_or_else(|_| None, |x| Some(x))
             .into()
     };
-    rx.iter().for_each(|cmd| {
-        println!("Received {:?}", cmd);
-        match cmd {
-            Command::Speak(text, interrupt) => {
-                let bstr = to_bstr(&text).unwrap();
-                // SVSFlagsAsync does not seem to work
-                let mut flags: SpeechVoiceSpeakFlags = SVSFIsNotXML;
-                flags.0 |= SVSFlagsAsync.0;
-                if interrupt {
-                    flags.0 |= SVSFPurgeBeforeSpeak.0;
-                }
-                let _ = unsafe { voice.as_ref().unwrap().Speak(&bstr, flags).is_ok() };
+    let mut last_stream: i32 = 0;
+    loop {
+        // We need to manually pump COM messages because
+        // using the async flag while speaking would put the speak request in a queue, which wouldn't be processed on this thread
+        unsafe {
+            let mut msg = MSG::default();
+            while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                DispatchMessageW(&msg);
             }
-            Command::IsActive(sender) => sender.send(true).unwrap_or_default(),
-            Command::IsSpeaking(sender) => {
-                let status = unsafe {
-                    voice
-                        .as_ref()
-                        .and_then(|v| v.Status().ok())
-                        .and_then(|s| s.RunningState().ok())
-                        .map(|run_state| run_state == SRSEIsSpeaking)
-                        .unwrap_or(false)
-                };
-                if !sender.is_closed() {
-                    sender.send(status).unwrap();
-                } else {
-                    println!("sender is closed.");
+        };
+        match rx.try_recv() {
+            Err(TryRecvError::Empty) => std::thread::sleep(Duration::from_millis(1)),
+            Err(TryRecvError::Disconnected) => break,
+            Ok(cmd) => match cmd {
+                Command::Speak(text, interrupt) => {
+                    let bstr = to_bstr(&text).unwrap();
+                    let mut flags: SpeechVoiceSpeakFlags = SVSFIsNotXML;
+                    flags.0 |= SVSFlagsAsync.0;
+                    if interrupt {
+                        flags.0 |= SVSFPurgeBeforeSpeak.0;
+                    }
+                    if let Ok(stream) = unsafe { voice.as_ref().unwrap().Speak(&bstr, flags) } {
+                        last_stream = stream;
+                    }
                 }
-            }
-            _ => println!("Unimplemented"),
+                Command::IsActive(sender) => sender.send(true).unwrap_or_default(),
+                Command::IsSpeaking(sender) => {
+                    let status = unsafe {
+                        voice
+                            .as_ref()
+                            .and_then(|v| v.Status().ok())
+                            .and_then(|s| s.RunningState().ok())
+                            .map(|run_state| run_state == SRSEIsSpeaking)
+                            .unwrap()
+                    };
+                    let _ = sender.send(status);
+                }
+                Command::Shutdown => break,
+                _ => println!("Unimplemented"),
+            },
         }
-    });
+    }
+    // After shutdown, keep pumping messages until all queued speech finishes
+    if last_stream > 0 {
+        if let Some(v) = voice.as_ref() {
+            loop {
+                unsafe {
+                    let mut msg = MSG::default();
+                    while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                        DispatchMessageW(&msg);
+                    }
+                }
+                let done = unsafe {
+                    v.Status()
+                        .ok()
+                        .map(|s| {
+                            let state = s.RunningState().unwrap_or(SRSEDone);
+                            let current = s.CurrentStreamNumber().unwrap_or(0);
+                            state == SRSEDone && current >= last_stream
+                        })
+                        .unwrap_or(true)
+                };
+                if done {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
     unsafe {
         CoUninitialize();
     }
@@ -65,8 +107,7 @@ struct SapiInner {
 
 impl Drop for SapiInner {
     fn drop(&mut self) {
-        // self.sender.send(Command::Shutdown).unwrap();        
-        println!("{:?}", self.sender.capacity());
+        let _ = self.sender.send(Command::Shutdown);
         if let Some(handle) = self.thread_handle.take() {
             handle.join().unwrap();
         }
@@ -89,16 +130,6 @@ impl Sapi {
             thread_handle: Some(thread_handle),
         });
         Self { inner }
-    }
-}
-
-impl Drop for Sapi {
-    fn drop(&mut self) {
-        loop {
-            if !self.is_speaking() {
-                break;
-            }
-        }
     }
 }
 
