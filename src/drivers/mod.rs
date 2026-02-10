@@ -5,14 +5,16 @@ pub use self::jaws::JAWS;
 pub use self::nvda::NVDA;
 pub use self::sapi::Sapi;
 
+use dyn_clone::DynClone;
 use thiserror::Error;
+
 /// The Driver trait
 ///
 /// This trait defines the interface of a screen reader driver
 /// It will be used to query info and interact with the underlying library instance
 /// Every method except for `speak` has a default implementation
 /// This allows for flexible customization and less repetitive code for the implementors of this trait, as screen readers and or TTS may support different features
-pub trait Driver {
+pub trait Driver: DynClone {
     /// the name of the driver
     fn name(&self) -> &'static str;
 
@@ -46,7 +48,7 @@ pub enum Command {
     Speak(String, bool),
     Braille(String),
     Output(String, bool),
-    IsSpeaking,
+    IsSpeaking(oneshot::Sender<bool>),
     Silence,
     /// used to shutdown the background thread loop
     /// Useful in Drop contexts
@@ -61,3 +63,5 @@ pub enum TalkError {
     #[error("Driver initialization has failed")]
     DriverInitializationError,
 }
+
+dyn_clone::clone_trait_object!(Driver);
